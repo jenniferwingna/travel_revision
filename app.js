@@ -213,6 +213,7 @@ window.addEventListener("hashchange", render);
 /* ---------- chapter view ---------- */
 function chapterTabs(c) {
   const t = [];
+  if (c.cheat) t.push(["cheat", "速查表", c.cheat.reduce((n, x) => n + x.rows.length, 0)]);
   if (c.concept) t.push(["concept", "知识点"]);
   if (c.anims && c.anims.length) t.push(["anim", "动画演示", c.anims.length]);
   if (c.qa && c.qa.length) t.push(["qa", c.qaLabel || "问答卡", c.qa.length]);
@@ -235,6 +236,7 @@ function renderChapter(view, c) {
   else if (tab === "qa") renderQA(body, c);
   else if (tab === "practice") renderPracticeList(body, c);
   else if (tab === "play") renderPlayground(body);
+  else if (tab === "cheat") renderCheat(body, c);
   body.querySelectorAll("[data-goto]").forEach((a) => a.addEventListener("click", (e) => {
     const [tb] = a.dataset.goto.split(":");
     tabMemory[c.id] = tb; renderChapter(view, c); e.preventDefault();
@@ -393,6 +395,41 @@ function renderWorkspace(view, c, p) {
   };
   confirmBtn($("#reset"), "重置代码", () => ed.set(p.starter));
   confirmBtn($("#loadsol"), "把答案放进编辑器", () => ed.set(p.solution));
+}
+
+/* ---------- cheat sheet ---------- */
+// Each row runs from the section's setup; the output column is what gen_pycheat.py captured from real Python.
+function renderCheat(body, c) {
+  const cxClass = (cx) => /n\^?2|n²|n \* m|2\^n|n!/.test(cx) ? "slow" : /log/.test(cx) ? "mid" : /^O\(1\)/.test(cx) ? "fast" : "";
+  body.innerHTML =
+    '<div class="cheatbar"><input id="cfind" type="search" placeholder="搜函数或关键词，如 pop、sort、Counter、O(n)" aria-label="搜索速查表"><span id="ccount"></span></div>' +
+    '<nav class="ctoc">' + c.cheat.map((sec) => '<button class="chip" data-sec="' + sec.id + '">' + esc(sec.title) + "</button>").join("") + "</nav>" +
+    '<p class="chint">每一行都从该小节的 <b>setup</b> 重新开始运行；<span class="cx fast">O(1)</span> <span class="cx mid">O(log n)</span> <span class="cx">O(n)</span> <span class="cx slow">O(n²)</span>。红色输出是故意演示的报错。点「试试」把代码放进自由练习区。</p>' +
+    c.cheat.map((sec) =>
+      '<section class="csec" id="sec-' + sec.id + '"><h2>' + esc(sec.title) + "</h2><p>" + esc(sec.intro) + "</p>" +
+      (sec.setup ? '<div class="csetup"><span>setup</span>' + codeBlock(sec.setup, "py") + "</div>" : "") +
+      sec.rows.map((r, i) =>
+        '<div class="crow" data-s="' + esc((r.code + " " + r.note + " " + r.cx + " " + sec.title).toLowerCase()) + '">' +
+        '<div class="ccode">' + codeBlock(r.code, "py") + "</div>" +
+        '<div class="cout"><pre class="' + (r.err ? "err" : "") + '">' + (r.out ? esc(r.out) : '<i>（没有输出）</i>') + "</pre></div>" +
+        '<div class="cmeta">' + (r.cx && r.cx !== "—" ? '<span class="cx ' + cxClass(r.cx) + '">' + esc(r.cx) + "</span>" : "") + "<span>" + esc(r.note) + '</span><button class="btn sm" data-try="' + sec.id + ":" + i + '">试试</button></div></div>').join("") +
+      "</section>").join("");
+  body.querySelectorAll("[data-sec]").forEach((b) => b.addEventListener("click", () => $("#sec-" + b.dataset.sec).scrollIntoView({ behavior: "smooth", block: "start" })));
+  body.querySelectorAll("[data-try]").forEach((b) => b.addEventListener("click", () => {
+    const [sid, i] = b.dataset.try.split(":");
+    const sec = c.cheat.find((x) => x.id === sid);
+    store.set("code:playground", (sec.setup ? sec.setup + "\n" : "") + sec.rows[+i].code + "\n");
+    location.hash = "playground";
+  }));
+  const rows = [...body.querySelectorAll(".crow")];
+  const count = () => { $("#ccount").textContent = rows.filter((r) => !r.hidden).length + " / " + rows.length; };
+  $("#cfind").addEventListener("input", (e) => {
+    const q = e.target.value.trim().toLowerCase();
+    rows.forEach((r) => { r.hidden = !!q && !r.dataset.s.includes(q); });
+    body.querySelectorAll(".csec").forEach((s) => { s.hidden = !!q && !s.querySelector(".crow:not([hidden])"); });
+    count();
+  });
+  count();
 }
 
 /* ---------- playground ---------- */

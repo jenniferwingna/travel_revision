@@ -17,6 +17,7 @@ window.CHAPTERS.push({
 </ol>
 
 <h2>2. Python 刷题必备语法</h2>
+<div class="note tip"><b class="lbl">更详细</b>每个函数打印什么、复杂度多少、每种数据类型最常用的操作，都在 <a href="#pysheet">01+ Python 语法速查表</a>（200 多行，每行都是真实运行结果）。下面是最精简的版本。</div>
 ~~~py
 # list
 a = [3, 1, 2]
